@@ -1,0 +1,6 @@
+# Proprietary vendor driver files fetched by tools/compare-with-vendor.sh.
+# Never commit these.
+vendor/
+__pycache__/
+*.pyc
+.DS_Store

@@ -1,0 +1,249 @@
+#!/usr/bin/python3
+"""CUPS filter: CUPS raster -> TSPL for Phomemo / Labelife label printers.
+
+Open replacement for the vendor's closed `rastertolabeltspl`. Reads the
+page bitmaps CUPS renders (CUPS raster v2 compressed or v3 uncompressed,
+1-bit or 8-bit, K/W/SW colour spaces) and writes plain TSPL:
+
+    SIZE / REFERENCE / DIRECTION / GAP / ... / CLS / BITMAP / PRINT 1,1
+
+Verified on the Phomemo PM64D (USB 2e3c:5760): output is byte-identical to
+the vendor filter's for the same raster (see tests/).
+
+Usage (called by cupsd): rastertotspl job user title copies options [file]
+"""
+import os
+import struct
+import sys
+
+HEADER_LEN = 1796  # cups_page_header2_t, raster v2/v3
+
+# cups_page_header2_t byte offsets
+OFF_HWRES = 276
+OFF_PAGESIZE = 352
+OFF_WIDTH = 372
+OFF_HEIGHT = 376
+OFF_BITS_PER_COLOR = 384
+OFF_BITS_PER_PIXEL = 388
+OFF_BYTES_PER_LINE = 392
+OFF_COLOR_ORDER = 396
+OFF_COLOR_SPACE = 400
+
+CSPACE_W, CSPACE_K, CSPACE_SW = 0, 3, 18
+
+# This printer's BITMAP data is 0 = black dot, 1 = white (including the
+# padding bits past the last pixel), as the vendor filter sends it.
+INVERT = bytes(255 - i for i in range(256))
+BITMAP_MODE_OR = 1
+
+# Option -> (TSPL range, default). Values are clamped integers, never passed
+# through as text, because IPP clients on the LAN choose them. A default of
+# None means "send nothing, keep the printer's own setting".
+INT_OPTIONS = {
+    "Darkness": (1, 15, None),
+    "PrintSpeed": (1, 6, 4),
+    "GapHeight": (0, 20, 3),
+}
+
+
+def log(level, msg):
+    sys.stderr.write(f"{level}: [rastertotspl] {msg}\n")
+    sys.stderr.flush()
+
+
+def ppd_defaults(path):
+    opts = {}
+    if not path or not os.path.exists(path):
+        return opts
+    with open(path, encoding="latin-1") as f:
+        for line in f:
+            if line.startswith("*Default"):
+                key, _, value = line[len("*Default"):].partition(":")
+                opts[key.strip()] = value.strip()
+    return opts
+
+
+def job_options(text):
+    opts = {}
+    for token in text.split():
+        key, _, value = token.partition("=")
+        opts[key] = value
+    return opts
+
+
+def int_option(opts, name):
+    lo, hi, default = INT_OPTIONS[name]
+    raw = opts.get(name)
+    if raw is None or raw == "Default":
+        return default
+    try:
+        value = int(float(raw))
+    except ValueError:
+        log("WARNING", f"ignoring non-numeric {name}={raw!r}")
+        return default
+    return max(lo, min(hi, value))
+
+
+class Reader:
+    def __init__(self, stream):
+        self.stream = stream
+
+    def need(self, n):
+        data = self.stream.read(n)
+        if len(data) != n:
+            raise EOFError(f"raster truncated: wanted {n} bytes, got {len(data)}")
+        return data
+
+
+def raster_lines(rd, header, compressed):
+    """Yield each scanline (cupsBytesPerLine bytes) of one page."""
+    bpl, height = header["bytes_per_line"], header["height"]
+    if not compressed:
+        for _ in range(height):
+            yield rd.need(bpl)
+        return
+    # CUPS raster v2 run-length coding (see cups/raster-stream.c).
+    unit = max(1, (header["bits_per_pixel"] + 7) // 8)
+    y = 0
+    while y < height:
+        repeat = rd.need(1)[0] + 1
+        line = bytearray()
+        while len(line) < bpl:
+            code = rd.need(1)[0]
+            if code & 0x80:
+                line += rd.need((257 - code) * unit)
+            else:
+                line += rd.need(unit) * (code + 1)
+        line = bytes(line[:bpl])
+        for _ in range(min(repeat, height - y)):
+            yield line
+            y += 1
+
+
+def black_bits(line, header):
+    """Convert one scanline to packed 1-bit, 1 = black, padding 0."""
+    bits, space = header["bits_per_color"], header["color_space"]
+    if bits == 1:
+        # K: 1 = black already. W/SW: 1 = white, so invert, then clear the
+        # padding bits past the last pixel.
+        row = line if space == CSPACE_K else line.translate(INVERT)
+        spare = len(row) * 8 - header["width"]
+        if spare and space != CSPACE_K:
+            row = row[:-1] + bytes([row[-1] & (0xFF << spare) & 0xFF])
+        return row
+    if bits == 8:
+        width = header["width"]
+        out = bytearray((width + 7) // 8)
+        for x in range(width):
+            v = line[x]
+            if (v >= 128) if space == CSPACE_K else (v < 128):
+                out[x >> 3] |= 0x80 >> (x & 7)
+        return bytes(out)
+    raise ValueError(f"unsupported cupsBitsPerColor {bits}")
+
+
+def to_tspl_row(line, header):
+    """One scanline as printer bitmap data (0 = black, 1 = white)."""
+    return black_bits(line, header).translate(INVERT)
+
+
+def main():
+    if len(sys.argv) not in (6, 7):
+        log("ERROR", "usage: rastertotspl job user title copies options [file]")
+        return 1
+
+    opts = ppd_defaults(os.environ.get("PPD"))
+    opts.update(job_options(sys.argv[5]))
+    density = int_option(opts, "Darkness")
+    speed = int_option(opts, "PrintSpeed")
+    gap = int_option(opts, "GapHeight")
+
+    src = open(sys.argv[6], "rb") if len(sys.argv) == 7 else sys.stdin.buffer
+    out = sys.stdout.buffer
+    rd = Reader(src)
+
+    sync = src.read(4)
+    if sync in (b"RaS2", b"RaS3"):
+        endian = ">"
+    elif sync in (b"2SaR", b"3SaR"):
+        endian = "<"
+    else:
+        log("ERROR", f"not CUPS raster v2/v3 (sync {sync!r})")
+        return 1
+    compressed = sync in (b"RaS2", b"2SaR")
+
+    page = 0
+    while True:
+        raw = src.read(HEADER_LEN)
+        if not raw:
+            break
+        if len(raw) != HEADER_LEN:
+            log("ERROR", "truncated page header")
+            return 1
+
+        def u32(off):
+            return struct.unpack_from(endian + "I", raw, off)[0]
+
+        header = {
+            "hwres": (u32(OFF_HWRES), u32(OFF_HWRES + 4)),
+            "page_pts": (u32(OFF_PAGESIZE), u32(OFF_PAGESIZE + 4)),
+            "width": u32(OFF_WIDTH),
+            "height": u32(OFF_HEIGHT),
+            "bits_per_color": u32(OFF_BITS_PER_COLOR),
+            "bits_per_pixel": u32(OFF_BITS_PER_PIXEL),
+            "bytes_per_line": u32(OFF_BYTES_PER_LINE),
+            "color_order": u32(OFF_COLOR_ORDER),
+            "color_space": u32(OFF_COLOR_SPACE),
+        }
+        if header["color_space"] not in (CSPACE_W, CSPACE_K, CSPACE_SW):
+            log("ERROR", f"unsupported cupsColorSpace {header['color_space']}")
+            return 1
+
+        page += 1
+        w_mm = header["page_pts"][0] * 25.4 / 72
+        h_mm = header["page_pts"][1] * 25.4 / 72
+        row_bytes = (header["width"] + 7) // 8
+        log(
+            "DEBUG",
+            f"page {page}: {header['width']}x{header['height']} dots, "
+            f"{w_mm:.1f}x{h_mm:.1f} mm, {header['bits_per_color']}-bit "
+            f"cspace {header['color_space']}, density {density} speed {speed} gap {gap}",
+        )
+
+        setup = (
+            f"SIZE {round(w_mm)} mm,{round(h_mm)} mm\r\n"
+            "REFERENCE 0,0\r\n"
+            "DIRECTION 0,0\r\n"
+            f"GAP {gap:.1f} mm,0.0 mm\r\n"
+            "SET TEAR ON\r\n"
+            "OFFSET 0 mm\r\n"
+        )
+        if density is not None:
+            setup += f"DENSITY {density}\r\n"
+        setup += f"SPEED {speed}\r\nCLS\r\n"
+        out.write(setup.encode("ascii"))
+
+        rows = [
+            to_tspl_row(line, header)[:row_bytes]
+            for line in raster_lines(rd, header, compressed)
+        ]
+        out.write(
+            f"BITMAP 0,0,{row_bytes},{len(rows)},{BITMAP_MODE_OR},".encode("ascii")
+        )
+        out.write(b"".join(rows))
+        out.write(b"\r\nPRINT 1,1\r\n")
+        out.flush()
+        sys.stderr.write(f"PAGE: {page} 1\n")
+
+    if page == 0:
+        log("ERROR", "no pages in job")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (EOFError, ValueError) as exc:
+        log("ERROR", str(exc))
+        sys.exit(1)

@@ -1,0 +1,26 @@
+services:
+  label-printer:
+    build: .
+    image: phomemo-tspl-airprint:local
+    container_name: label-printer
+    restart: unless-stopped
+    # Host network: IPP on :631 and the AirPrint advertisement both use the
+    # host's address. Port 631 must be free on the host.
+    network_mode: host
+    environment:
+      PRINTER_NAME: PM64D
+      PRINTER_INFO: Phomemo PM64D label printer
+      PRINTER_LOCATION: ""
+      PAGE_SIZE: w288h432          # 4x6 in; see ppd/phomemo-pm64d.ppd for others
+      CUPS_ALLOW: ""               # e.g. "100.64.0.0/10" to allow a Tailscale tailnet
+    volumes:
+      # The /dev/usb directory, not the lp0 node, so the container keeps
+      # working when the printer is unplugged and plugged back in.
+      - /dev/usb:/dev/usb
+      # cupsd registers Bonjour/AirPrint through the host's avahi-daemon.
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+      # Optional vendor reference queue, see tools/compare-with-vendor.sh:
+      # - ./vendor:/opt/vendor:ro
+    device_cgroup_rules:
+      - "c 180:* rw"   # USB printer character devices (usblp) only
+    mem_limit: 256m

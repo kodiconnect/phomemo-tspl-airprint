@@ -1,0 +1,114 @@
+*PPD-Adobe: "4.3"
+*FormatVersion: "4.3"
+*FileVersion: "1.0"
+*LanguageVersion: English
+*LanguageEncoding: ISOLatin1
+*PCFileName: "PM64DTSP.PPD"
+*Manufacturer: "Phomemo"
+*Product: "(PM64D)"
+*ModelName: "Phomemo PM64D open TSPL"
+*ShortNickName: "Phomemo PM64D TSPL"
+*NickName: "Phomemo PM64D, open TSPL filter"
+*PSVersion: "(3010.000) 0"
+*LanguageLevel: "3"
+*ColorDevice: False
+*DefaultColorSpace: Gray
+*FileSystem: False
+*Throughput: "1"
+*LandscapeOrientation: Plus90
+*TTRasterizer: Type42
+*1284DeviceID: "MFG:;CMD:XPP,XL;MDL:PM64D;CLS:PRINTER;"
+*cupsVersion: 2.4
+*cupsModelNumber: 0
+*cupsManualCopies: True
+*cupsFilter: "application/vnd.cups-raster 0 rastertotspl"
+
+*OpenUI *PageSize/Media Size: PickOne
+*OrderDependency: 10 AnySetup *PageSize
+*DefaultPageSize: w288h432
+*PageSize w288h432/4 x 6 in: "<</PageSize[288 432]/ImagingBBox null>>setpagedevice"
+*PageSize w283h425/100 x 150 mm: "<</PageSize[283 425]/ImagingBBox null>>setpagedevice"
+*PageSize w288h288/4 x 4 in: "<</PageSize[288 288]/ImagingBBox null>>setpagedevice"
+*PageSize w288h216/4 x 3 in: "<</PageSize[288 216]/ImagingBBox null>>setpagedevice"
+*PageSize w288h144/4 x 2 in: "<</PageSize[288 144]/ImagingBBox null>>setpagedevice"
+*PageSize w216h144/3 x 2 in: "<</PageSize[216 144]/ImagingBBox null>>setpagedevice"
+*PageSize w144h72/2 x 1 in: "<</PageSize[144 72]/ImagingBBox null>>setpagedevice"
+*CloseUI: *PageSize
+
+*OpenUI *PageRegion/Media Size: PickOne
+*OrderDependency: 10 AnySetup *PageRegion
+*DefaultPageRegion: w288h432
+*PageRegion w288h432/4 x 6 in: "<</PageSize[288 432]/ImagingBBox null>>setpagedevice"
+*PageRegion w283h425/100 x 150 mm: "<</PageSize[283 425]/ImagingBBox null>>setpagedevice"
+*PageRegion w288h288/4 x 4 in: "<</PageSize[288 288]/ImagingBBox null>>setpagedevice"
+*PageRegion w288h216/4 x 3 in: "<</PageSize[288 216]/ImagingBBox null>>setpagedevice"
+*PageRegion w288h144/4 x 2 in: "<</PageSize[288 144]/ImagingBBox null>>setpagedevice"
+*PageRegion w216h144/3 x 2 in: "<</PageSize[216 144]/ImagingBBox null>>setpagedevice"
+*PageRegion w144h72/2 x 1 in: "<</PageSize[144 72]/ImagingBBox null>>setpagedevice"
+*CloseUI: *PageRegion
+
+*DefaultImageableArea: w288h432
+*ImageableArea w288h432/4 x 6 in: "0 0 288 432"
+*ImageableArea w283h425/100 x 150 mm: "0 0 283 425"
+*ImageableArea w288h288/4 x 4 in: "0 0 288 288"
+*ImageableArea w288h216/4 x 3 in: "0 0 288 216"
+*ImageableArea w288h144/4 x 2 in: "0 0 288 144"
+*ImageableArea w216h144/3 x 2 in: "0 0 216 144"
+*ImageableArea w144h72/2 x 1 in: "0 0 144 72"
+*DefaultPaperDimension: w288h432
+*PaperDimension w288h432/4 x 6 in: "288 432"
+*PaperDimension w283h425/100 x 150 mm: "283 425"
+*PaperDimension w288h288/4 x 4 in: "288 288"
+*PaperDimension w288h216/4 x 3 in: "288 216"
+*PaperDimension w288h144/4 x 2 in: "288 144"
+*PaperDimension w216h144/3 x 2 in: "216 144"
+*PaperDimension w144h72/2 x 1 in: "144 72"
+
+*OpenUI *Resolution/Resolution: PickOne
+*OrderDependency: 10 AnySetup *Resolution
+*DefaultResolution: 203dpi
+*Resolution 203dpi/203 DPI: "<</HWResolution[203 203]/cupsBitsPerColor 1/cupsColorOrder 0/cupsColorSpace 3>>setpagedevice"
+*CloseUI: *Resolution
+
+*OpenUI *Darkness/Darkness: PickOne
+*OrderDependency: 20 AnySetup *Darkness
+*DefaultDarkness: Default
+*Darkness Default/Printer Default: ""
+*Darkness 1/1: ""
+*Darkness 2/2: ""
+*Darkness 3/3: ""
+*Darkness 4/4: ""
+*Darkness 5/5: ""
+*Darkness 6/6: ""
+*Darkness 7/7: ""
+*Darkness 8/8: ""
+*Darkness 9/9: ""
+*Darkness 10/10: ""
+*Darkness 11/11: ""
+*Darkness 12/12: ""
+*Darkness 13/13: ""
+*Darkness 14/14: ""
+*Darkness 15/15: ""
+*CloseUI: *Darkness
+
+*OpenUI *PrintSpeed/Print Speed: PickOne
+*OrderDependency: 20 AnySetup *PrintSpeed
+*DefaultPrintSpeed: 4
+*PrintSpeed 2/2 in/s: ""
+*PrintSpeed 3/3 in/s: ""
+*PrintSpeed 4/4 in/s: ""
+*PrintSpeed 5/5 in/s: ""
+*PrintSpeed 6/6 in/s: ""
+*CloseUI: *PrintSpeed
+
+*OpenUI *GapHeight/Gap Between Labels: PickOne
+*OrderDependency: 20 AnySetup *GapHeight
+*DefaultGapHeight: 3
+*GapHeight 0/None (continuous): ""
+*GapHeight 2/2 mm: ""
+*GapHeight 3/3 mm: ""
+*GapHeight 4/4 mm: ""
+*GapHeight 5/5 mm: ""
+*GapHeight 6/6 mm: ""
+*CloseUI: *GapHeight
+
